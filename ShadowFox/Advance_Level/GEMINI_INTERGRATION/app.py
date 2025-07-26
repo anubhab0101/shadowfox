@@ -863,5 +863,5 @@ elif page == "Results Dashboard":
 
 # Footer
 st.markdown("---")
-st.markdown("### 🧠 NLP/ML Analysis Platform | Powered by Perplexity API")
+st.markdown("### 🧠 NLP/ML Analysis Platform | Powered by GEMINI API")
 st.markdown("*Advanced Language Model Analysis & Research Framework*")
