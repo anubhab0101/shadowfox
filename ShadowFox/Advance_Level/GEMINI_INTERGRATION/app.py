@@ -1,4 +1,27 @@
 import streamlit as st
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+def main():
+    st.set_page_config(
+        page_title="ShadowFox App",
+        page_icon="🦊",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    
+    # Your existing app code here
+    st.title("ShadowFox App")
+    # ... rest of your app code ...
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
