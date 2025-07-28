@@ -36,7 +36,7 @@ class AnalysisEngine:
     def analyze_prompt(
         self,
         prompt: str,
-        model: str = "llama-3.1-sonar-small-128k-online",
+        model: str = "gemini-2.5-flash",
         max_tokens: int = 500,
         temperature: float = 0.7,
         analyze_sentiment: bool = True,
@@ -51,7 +51,7 @@ class AnalysisEngine:
             # Rate limiting
             self.rate_limiter.wait_if_needed()
             
-            # Get response from Perplexity
+            # Get response from Gemini
             api_response = self.client.simple_query(
                 prompt=prompt,
                 model=model,
@@ -64,6 +64,10 @@ class AnalysisEngine:
             citations = self.client.extract_citations(api_response)
             usage_info = self.client.get_usage_info(api_response)
             response_time = api_response.get('_response_time', 0)
+            
+            # Check if response content is empty
+            if not response_content or len(response_content.strip()) == 0:
+                response_content = "No response generated"
             
             # Initialize analysis results
             analysis_results = {
@@ -134,7 +138,7 @@ class AnalysisEngine:
                         'word_count': analysis.get('word_count', 0),
                         'sentiment_score': analysis.get('sentiment', {}).get('score', 0),
                         'complexity_score': analysis.get('complexity', {}).get('score', 0),
-                        'citation_count': len(result.get('citations', [])),
+                        'citation_count': analysis.get('citations', {}).get('count', 0),
                         'response_time': result.get('response_time', 0),
                         'quality_score': analysis.get('quality_score', 0)
                     }
@@ -153,7 +157,7 @@ class AnalysisEngine:
         models: List[str],
         test_suite: str = "Quick Evaluation",
         iterations: int = 3,
-        metrics: List[str] = None,
+        metrics: Optional[List[str]] = None,
         progress_callback: Optional[Callable] = None
     ) -> Dict[str, Dict[str, Any]]:
         """
@@ -320,13 +324,14 @@ class AnalysisEngine:
         
         # Flesch Reading Ease approximation
         avg_sentence_length = len(words) / max(len(sentences), 1)
-        avg_syllables = np.mean([self._count_syllables(word) for word in words])
+        syllable_counts = [self._count_syllables(word) for word in words]
+        avg_syllables = sum(syllable_counts) / len(syllable_counts) if syllable_counts else 1
         
         # Simplified Flesch formula
         complexity_score = 206.835 - (1.015 * avg_sentence_length) - (84.6 * avg_syllables)
         
         # Normalize to 0-1 scale
-        normalized_score = max(0.0, min(1.0, (100 - complexity_score) / 100))
+        normalized_score = max(0.0, min(1.0, float((100 - complexity_score) / 100)))
         
         # Determine reading level
         if complexity_score >= 90:
@@ -452,32 +457,44 @@ class AnalysisEngine:
         
         # Response time metrics
         if model_results['response_times']:
-            metrics['avg_response_time'] = np.mean(model_results['response_times'])
-            metrics['min_response_time'] = min(model_results['response_times'])
-            metrics['max_response_time'] = max(model_results['response_times'])
-            metrics['response_time_std'] = np.std(model_results['response_times'])
+            response_times = model_results['response_times']
+            metrics['avg_response_time'] = sum(response_times) / len(response_times)
+            metrics['min_response_time'] = min(response_times)
+            metrics['max_response_time'] = max(response_times)
+            # Calculate standard deviation
+            mean_rt = metrics['avg_response_time']
+            variance = sum((x - mean_rt) ** 2 for x in response_times) / len(response_times)
+            metrics['response_time_std'] = variance ** 0.5
         
         # Token efficiency
         if model_results['token_counts']:
-            metrics['avg_tokens'] = np.mean(model_results['token_counts'])
-            metrics['token_variance'] = np.var(model_results['token_counts'])
-            metrics['token_efficiency'] = 1.0 / (1.0 + metrics['token_variance'] * 0.001)
+            token_counts = model_results['token_counts']
+            metrics['avg_tokens'] = sum(token_counts) / len(token_counts)
+            mean_tokens = metrics['avg_tokens']
+            variance = sum((x - mean_tokens) ** 2 for x in token_counts) / len(token_counts)
+            metrics['token_variance'] = variance
+            metrics['token_efficiency'] = 1.0 / (1.0 + variance * 0.001)
         
         # Citation quality
         if model_results['citation_scores']:
-            metrics['citation_score'] = np.mean(model_results['citation_scores'])
+            citation_scores = model_results['citation_scores']
+            metrics['citation_score'] = sum(citation_scores) / len(citation_scores)
         
         # Quality scores
         if model_results['quality_scores']:
-            metrics['quality_score'] = np.mean(model_results['quality_scores'])
+            quality_scores = model_results['quality_scores']
+            metrics['quality_score'] = sum(quality_scores) / len(quality_scores)
         
         # Consistency
         if model_results['consistency_scores']:
-            metrics['consistency_score'] = np.mean(model_results['consistency_scores'])
+            consistency_scores = model_results['consistency_scores']
+            metrics['consistency_score'] = sum(consistency_scores) / len(consistency_scores)
         
         # Error rate
-        total_tests = len(model_results['response_times']) + model_results['errors']
-        metrics['error_rate'] = (model_results['errors'] / max(total_tests, 1)) * 100
+        num_response_times = len(model_results.get('response_times', []))
+        num_errors = model_results.get('errors', 0)
+        total_tests = num_response_times + num_errors
+        metrics['error_rate'] = (num_errors / max(total_tests, 1)) * 100
         
         # Overall score
         component_scores = [

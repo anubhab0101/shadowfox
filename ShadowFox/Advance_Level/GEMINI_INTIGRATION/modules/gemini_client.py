@@ -163,8 +163,14 @@ class GeminiClient:
     def extract_response_content(self, api_response: Dict[str, Any]) -> str:
         """Extract the text content from API response"""
         try:
-            return api_response['choices'][0]['message']['content']
-        except (KeyError, IndexError):
+            content = api_response['choices'][0]['message']['content']
+            if not content:
+                print(f"Debug: Empty content in API response")
+                return ""
+            return content
+        except (KeyError, IndexError) as e:
+            print(f"Debug: Invalid API response format: {e}")
+            print(f"Debug: API response keys: {list(api_response.keys())}")
             raise Exception("Invalid API response format")
     
     def extract_citations(self, api_response: Dict[str, Any]) -> List[str]:

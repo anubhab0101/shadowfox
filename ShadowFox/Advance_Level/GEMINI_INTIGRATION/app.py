@@ -1,27 +1,4 @@
 import streamlit as st
-import os
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
-
-def main():
-    st.set_page_config(
-        page_title="ShadowFox App",
-        page_icon="🦊",
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
-    
-    # Your existing app code here
-    st.title("ShadowFox App")
-    # ... rest of your app code ...
-
-if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        st.error(f"An error occurred: {str(e)}")
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -31,8 +8,14 @@ import time
 import json
 import os
 
-os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
+try:
+    os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
+except KeyError:
+    st.error("Google API Key not found in secrets.toml. Please add your API key to .streamlit/secrets.toml")
+    st.info("Add this to your .streamlit/secrets.toml file:\nGOOGLE_API_KEY = 'your-api-key-here'")
+    st.stop()
 
+# Import custom modules
 from modules.gemini_client import GeminiClient
 from modules.analysis_engine import AnalysisEngine
 from modules.visualization import VisualizationManager
@@ -41,13 +24,15 @@ from data.sample_prompts import SAMPLE_PROMPTS, RESEARCH_QUESTIONS
 from utils.rate_limiter import RateLimiter
 from utils.text_processor import TextProcessor
 
+# Page configuration
 st.set_page_config(
-    page_title="NLP/ML Analysis Platform - Gemini API",
+    page_title="NLP/ML Analysis Platform - Google Gemini API",
     page_icon="🧠",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
+# Initialize session state
 if 'analysis_results' not in st.session_state:
     st.session_state.analysis_results = []
 if 'current_analysis' not in st.session_state:
@@ -55,6 +40,7 @@ if 'current_analysis' not in st.session_state:
 if 'research_data' not in st.session_state:
     st.session_state.research_data = {}
 
+# Initialize components
 @st.cache_resource
 def initialize_components():
     """Initialize all analysis components"""
@@ -68,6 +54,7 @@ def initialize_components():
         return gemini_client, analysis_engine, viz_manager, research_framework, text_processor
     except Exception as e:
         st.error(f"Failed to initialize components: {str(e)}")
+        # Return placeholder objects instead of None to prevent attribute errors
         return None, None, None, None, None
 
 # Header
@@ -183,7 +170,7 @@ elif page == "Model Testing":
     # Execute analysis
     if st.button("🚀 Run Analysis", type="primary"):
         if user_prompt:
-            with st.spinner("Analyzing with Perplexity API..."):
+            with st.spinner("Analyzing with Gemini API..."):
                 try:
                     # Single model analysis
                     result = analysis_engine.analyze_prompt(
@@ -886,5 +873,5 @@ elif page == "Results Dashboard":
 
 # Footer
 st.markdown("---")
-st.markdown("### 🧠 NLP/ML Analysis Platform | Powered by GEMINI API")
+st.markdown("### 🧠 NLP/ML Analysis Platform | Powered by Google Gemini API")
 st.markdown("*Advanced Language Model Analysis & Research Framework*")
